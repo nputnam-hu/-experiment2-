@@ -89,29 +89,45 @@ Query the laws database using RAG.
 **Response:**
 ```json
 {
-  "query": "What happens if I steal?",
-  "response": "According to the laws, theft is punishable by hanging...",
-  "citations": [
-    {
-      "source": "5.1.1",
-      "text": "Theft is punishable by hanging...",
-      "page": 12,
-      "subsection_id": "5.1.1",
-      "section_name": "Trials by combat"
-    }
-  ]
+  "status": "success",
+  "message": "Success",
+  "data": {
+    "query": "What happens if I steal?",
+    "response": "According to the laws, theft is punishable by hanging...",
+    "citations": [
+      {
+        "source": "Section 5.1.1",
+        "text": "Theft is punishable by hanging...",
+        "page": 12,
+        "score": 0.85
+      }
+    ]
+  },
+  "meta": {
+    "timestamp": "2023-11-20T10:00:00Z",
+    "latency_ms": 150.5,
+    "api_version": "1.0"
+  },
+  "errors": null
 }
 ```
 
 **Response Fields:**
-- `query`: The original query string
-- `response`: The LLM-generated answer based on retrieved laws
-- `citations`: Array of citation objects with:
-  - `source`: Section or subsection ID (e.g., "5.1.1")
-  - `text`: The relevant text snippet from the law
-  - `page`: Page number in the PDF (optional)
-  - `subsection_id`: Subsection identifier (e.g., "5.1.1") (optional)
-  - `section_name`: Name of the section (e.g., "Trials by combat") (optional)
+- `status`: API status ("success" or "error")
+- `message`: Human-readable status message
+- `data`: The payload (for success responses)
+  - `query`: The original query string
+  - `response`: The LLM-generated answer based on retrieved laws
+  - `citations`: Array of citation objects with:
+    - `source`: Section identifier (e.g., "Section 5.1.1")
+    - `text`: The relevant text snippet from the law
+    - `page`: Page number in the PDF (optional)
+    - `score`: Relevance score (optional)
+- `meta`: Request metadata
+  - `timestamp`: Request completion timestamp
+  - `latency_ms`: Processing time in milliseconds
+  - `api_version`: API version
+- `errors`: List of errors (if any)
 
 ### Example Usage
 

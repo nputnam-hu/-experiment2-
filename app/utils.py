@@ -1,8 +1,17 @@
 from dotenv import load_dotenv
 import os
+import warnings
 
 # Load environment variables from .env file if it exists
 load_dotenv()
+
+# Suppress Qdrant payload index warning for in-memory client
+warnings.filterwarnings(
+    "ignore",
+    message="Payload indexes have no effect in the local Qdrant",
+    category=UserWarning,
+    module="llama_index.vector_stores.qdrant.base"
+)
 
 from pydantic import BaseModel
 import qdrant_client
@@ -39,8 +48,7 @@ class Citation(BaseModel):
     source: str
     text: str
     page: Optional[int] = None
-    subsection_id: Optional[str] = None
-    section_name: Optional[str] = None
+    score: Optional[float] = None
 
 class Output(BaseModel):
     query: str
@@ -64,13 +72,12 @@ class DocumentService:
         
         with pdfplumber.open(self.pdf_path) as pdf:
             current_section_id = None
-            current_subsection_id = None
             current_section_name = None
             current_text = []
             current_page = None
             
             # Pattern to match section headers like "5", "5.1", "5.1.1"
-            section_pattern = re.compile(r'^(\d+(?:\.\d+)*)\s*(.*?)$')
+            section_pattern = re.compile(r'^(\d+(?:\.\d+)*)\.?\s*(.*?)$')
             # Pattern to match subsection headers
             subsection_pattern = re.compile(r'^(\d+(?:\.\d+)+)\s+(.+)$')
             
@@ -97,7 +104,6 @@ class DocumentService:
                                     text=doc_text,
                                     metadata={
                                         "section_id": current_section_id,
-                                        "subsection_id": current_subsection_id or current_section_id,
                                         "section_name": current_section_name or f"Section {current_section_id}",
                                         "page": current_page or page_num
                                     }
@@ -105,26 +111,19 @@ class DocumentService:
                         
                         # Start new section
                         current_section_id = section_match.group(1)
-                        section_name_part = section_match.group(2).strip()
+                        text_part = section_match.group(2).strip()
                         
-                        # Determine if this is a subsection (has dots) or main section
-                        if '.' in current_section_id:
-                            # This is a subsection
-                            parts = current_section_id.split('.')
-                            if len(parts) == 2:
-                                # Parent section like 5.1
-                                current_subsection_id = current_section_id
-                                current_section_name = section_name_part if section_name_part else f"Section {current_section_id}"
-                            else:
-                                # Deeper subsection like 5.1.1
-                                current_subsection_id = current_section_id
-                                current_section_name = section_name_part if section_name_part else None
+                        # Determine if the text part is a title or content
+                        # Heuristic: Titles are short and typically don't end with a period (unless it's a single word/phrase).
+                        # Long text or text ending in period is likely content.
+                        is_likely_title = len(text_part) < 60 and not text_part.endswith('.')
+                        
+                        if is_likely_title and text_part:
+                            current_section_name = text_part
                         else:
-                            # Main section
-                            current_subsection_id = None
-                            current_section_name = section_name_part if section_name_part else f"Section {current_section_id}"
+                            current_section_name = f"Section {current_section_id}"
                         
-                        current_text = []
+                        current_text = [text_part] if text_part else []
                         current_page = page_num
                     else:
                         # Continuation of current section
@@ -139,7 +138,6 @@ class DocumentService:
                         text=doc_text,
                         metadata={
                             "section_id": current_section_id,
-                            "subsection_id": current_subsection_id or current_section_id,
                             "section_name": current_section_name or f"Section {current_section_id}",
                             "page": current_page or len(pdf.pages)
                         }
@@ -149,24 +147,17 @@ class DocumentService:
         section_name_map = {}
         for doc in docs:
             section_id = doc.metadata.get("section_id")
-            subsection_id = doc.metadata.get("subsection_id")
             section_name = doc.metadata.get("section_name")
             
-            if section_name and not section_name.startswith("Section"):
+            if section_id and section_name and not section_name.startswith("Section"):
                 section_name_map[section_id] = section_name
-                if subsection_id:
-                    section_name_map[subsection_id] = section_name
         
         # Fill in missing section names from parent sections
         for doc in docs:
             if not doc.metadata.get("section_name") or doc.metadata.get("section_name", "").startswith("Section"):
                 section_id = doc.metadata.get("section_id")
-                subsection_id = doc.metadata.get("subsection_id")
                 
-                # Try to get from subsection first, then section
-                if subsection_id and subsection_id in section_name_map:
-                    doc.metadata["section_name"] = section_name_map[subsection_id]
-                elif section_id and section_id in section_name_map:
+                if section_id and section_id in section_name_map:
                     doc.metadata["section_name"] = section_name_map[section_id]
         
         return docs
@@ -249,25 +240,34 @@ class QdrantService:
         citations = []
         if hasattr(response, 'source_nodes') and response.source_nodes:
             for node in response.source_nodes:
-                metadata = node.metadata if hasattr(node, 'metadata') else {}
-                node_text = node.text if hasattr(node, 'text') else str(node)
+                # Handle NodeWithScore objects from LlamaIndex
+                actual_node = node.node if hasattr(node, 'node') else node
+                score = node.score if hasattr(node, 'score') else None
+                
+                metadata = actual_node.metadata if hasattr(actual_node, 'metadata') else {}
+                node_text = actual_node.text if hasattr(actual_node, 'text') else str(actual_node)
+                node_text = re.sub(r'^Source \d+:\s*', '', node_text)
+                node_text = node_text.replace('\n', ' ').strip()
                 
                 # Extract metadata fields
-                source_id = metadata.get('subsection_id') or metadata.get('section_id', 'Unknown')
+                section_id = metadata.get('section_id')
                 page = metadata.get('page')
-                subsection_id = metadata.get('subsection_id')
-                section_name = metadata.get('section_name')
+                
+                # Format source as "Section X" to be a valid RAG source
+                source = f"Section {section_id}" if section_id else "Unknown"
                 
                 citations.append(Citation(
-                    source=source_id,
+                    source=source,
                     text=node_text,
                     page=page,
-                    subsection_id=subsection_id,
-                    section_name=section_name
+                    score=score
                 ))
         
-        # Get response text
-        response_text = str(response) if response else ""
+        # Get response text (avoid default Source 1/2 prefixes if possible)
+        if response is None:
+            response_text = ""
+        else:
+            response_text = getattr(response, "response", None) or str(response)
         
         return Output(
             query=query_str,
@@ -278,15 +278,20 @@ class QdrantService:
 
 if __name__ == "__main__":
     # Example workflow
-    doc_serivce = DocumentService() # implemented
-    docs = doc_serivce.create_documents() # NOT implemented
+    doc_serivce = DocumentService()
+    docs = doc_serivce.create_documents()
 
-    index = QdrantService() # implemented
-    index.connect() # implemented
-    index.load() # implemented
+    index = QdrantService()
+    index.connect()
+    index.load()
 
-    index.query("what happens if I steal?") # NOT implemented
+    import json
 
+    result1 = index.query("what happens if I steal?")
+    print(json.dumps(result1.model_dump(), indent=2, ensure_ascii=False))
+    
+    result2 = index.query("How does justice work?")
+    print(json.dumps(result2.model_dump(), indent=2, ensure_ascii=False))
 
 
 
