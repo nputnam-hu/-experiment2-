@@ -50,9 +50,15 @@ class Citation(BaseModel):
     page: Optional[int] = None
     score: Optional[float] = None
 
+class TextSegment(BaseModel):
+    text: str
+    citation_index: Optional[int] = None
+    citation_text: Optional[str] = None
+
 class Output(BaseModel):
     query: str
     response: str
+    response_segments: list[TextSegment]
     citations: list[Citation]
 
 class DocumentService:
@@ -269,9 +275,40 @@ class QdrantService:
         else:
             response_text = getattr(response, "response", None) or str(response)
         
+        # Parse response text into segments
+        response_segments = []
+        # Split by citation markers like [1], [2]
+        parts = re.split(r'(\[\d+\])', response_text)
+        
+        for part in parts:
+            if not part:
+                continue
+            
+            citation_match = re.match(r'^\[(\d+)\]$', part)
+            if citation_match:
+                citation_num = int(citation_match.group(1))
+                # Validate if this citation number exists in our citations list
+                # LlamaIndex uses 1-based indexing for citations in text
+                citation_index = citation_num - 1
+                
+                if 0 <= citation_index < len(citations):
+                    # It's a valid citation
+                    response_segments.append(TextSegment(
+                        text=part,
+                        citation_index=citation_index,
+                        citation_text=citations[citation_index].source
+                    ))
+                else:
+                    # It's text that looks like a citation but index is out of bounds
+                    response_segments.append(TextSegment(text=part))
+            else:
+                # Regular text
+                response_segments.append(TextSegment(text=part))
+
         return Output(
             query=query_str,
             response=response_text,
+            response_segments=response_segments,
             citations=citations
         )
        

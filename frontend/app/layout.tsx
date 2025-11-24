@@ -6,8 +6,8 @@ import { Providers } from './providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Norm Ai Takehome',
-  description: 'Full-Stack take home exercise for Norm Ai.',
+  title: 'Westeros Legal Assistant',
+  description: 'Ask questions about the laws of the Seven Kingdoms',
 };
 
 export default function RootLayout({

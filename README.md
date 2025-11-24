@@ -2,6 +2,51 @@
 
 This repository contains a RAG (Retrieval-Augmented Generation) pipeline API that allows querying a database of laws from the fictional series "Game of Thrones". The API uses LlamaIndex, Qdrant vector store, and OpenAI embeddings/LLM to provide semantic search over the laws PDF document.
 
+Decisions are documented in [Decision Documentation](decisionDocumentation.md)
+Reflections are documented in [Reflective Response](reflectiveResponse.md)
+
+## Getting Started
+
+1. Clone the repository
+2. Install the dependencies with `pip install -r requirements.txt` in the root directory
+3. Run the server with `uvicorn app.main:app --host localhost --port 8000` or with Docker (see below)
+4. Run the frontend with `pnpm run dev` or with Docker (see below)
+
+## Project Structure
+
+The project is organized into backend services (`app/`) and a frontend client (`frontend/`).
+
+```
+.
+├── app/                         # Backend FastAPI application
+│   ├── __init__.py
+│   ├── dependencies.py          # Dependency injection (API Key validation)
+│   ├── main.py                  # App entry point & configuration
+│   ├── data_models.py           # Pydantic data models (Request/Response)
+│   ├── routers.py               # API Route definitions
+│   └── utils.py                 # Core RAG logic & Qdrant service
+├── docs/                        # Documentation & Source files
+│   └── laws.pdf                 # Source legal text
+├── frontend/                    # Next.js Client Application
+│   ├── app/                     # Next.js App Router pages
+│   │   ├── layout.tsx           # Root layout
+│   │   ├── page.tsx             # Main chat interface
+│   │   └── providers.tsx        # React Query & Chakra providers
+│   ├── components/              # UI Components
+│   │   ├── CitationCard.tsx     # Displays individual source citations
+│   │   ├── FeedbackControls.tsx # Thumbs up/down feedback UI
+│   │   ├── HeaderNav.tsx        # Application header
+│   │   ├── PdfViewer.tsx        # Modal PDF viewer
+│   │   ├── ResultsDisplay.tsx   # Renders answer text and citations
+│   │   ├── SearchInput.tsx      # Search bar and options
+│   │   ├── Sidebar.tsx          # History sidebar
+│   │   └── WelcomeScreen.tsx    # Initial empty state view
+│   ├── lib/                     # Utilities
+│   │   └── api.ts               # API client and type definitions
+│   └── public/                  # Static assets
+└── requirements.txt             # Python dependencies
+```
+
 ## Server Repository
 
 ### Overview
@@ -94,6 +139,13 @@ Query the laws database using RAG.
   "data": {
     "query": "What happens if I steal?",
     "response": "According to the laws, theft is punishable by hanging...",
+    "response_segments": [
+      {
+        "text": "According to the laws, theft is punishable by hanging...",
+        "citation_index": 0,
+        "citation_text": "Section 5.1.1"
+      }
+    ],
     "citations": [
       {
         "source": "Section 5.1.1",
@@ -118,6 +170,10 @@ Query the laws database using RAG.
 - `data`: The payload (for success responses)
   - `query`: The original query string
   - `response`: The LLM-generated answer based on retrieved laws
+  - `response_segments`: Array of text segments (with optional citation links) used by the frontend to render rich, citation-aware answers. Each segment has:
+    - `text`: The raw text for this segment (may include citation markers like `[1]`)
+    - `citation_index`: Zero-based index into the `citations` array for this segment (optional)
+    - `citation_text`: Human-readable citation label (e.g., "Section 5.1.1") (optional)
   - `citations`: Array of citation objects with:
     - `source`: Section identifier (e.g., "Section 5.1.1")
     - `text`: The relevant text snippet from the law
@@ -161,28 +217,3 @@ data = {
 response = requests.post(url, json=data, headers=headers)
 print(response.json())
 ```
-
-### Design Choices and Assumptions
-
-1. **PDF Parsing:** The PDF is parsed by detecting section headers that start with numbers (e.g., "5", "5.1", "5.1.1"). Each section becomes a separate document in the vector store.
-
-2. **Section Names:** Section names are extracted from headers when available. If a subsection doesn't have a name, it inherits from its parent section.
-
-3. **Vector Store:** Uses Qdrant in-memory vector store for simplicity. In production, you might want to use a persistent Qdrant instance.
-
-4. **Initialization:** The index is built once at startup to avoid re-embedding the PDF on every request, improving performance.
-
-5. **Authentication:** Simple API key authentication via header. In production, consider more robust authentication mechanisms.
-
-6. **Error Handling:** The API includes basic error handling for invalid queries, missing API keys, and service initialization failures.
-
-### Limitations
-
-- The PDF parsing relies on consistent formatting. Irregular PDFs may require adjustments to the parsing logic.
-- The in-memory Qdrant store means the index is rebuilt on each container restart.
-- Query length is limited to 1000 characters.
-- The `k` parameter is limited to a maximum of 20 to prevent performance issues.
-
-## Client Repository 
-
-In the `frontend` folder you'll find a light NextJS app with its own README including instructions to run. Your task here is to build a minimal client experience that utilizes the service built in part 1.

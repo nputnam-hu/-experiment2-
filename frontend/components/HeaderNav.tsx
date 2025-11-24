@@ -73,11 +73,6 @@ export default function HeaderNav({
                   label="Documents"
                   linkPath="/"
                 />
-                <NavButton
-                  navIconEnum={NavIconEnum.CREATE_PROJECT}
-                  label="New Conversation"
-                  linkPath="/"
-                />
               </HStack>
               <Box height="32px" width="1px" bg="#DBDCE1" mx={3} />
               <MenuButton
