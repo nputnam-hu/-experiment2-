@@ -10,11 +10,12 @@ import {
   SliderTrack,
   SliderFilledTrack,
   SliderThumb,
-  Text,
   FormControl,
   FormLabel,
   HStack,
   Switch,
+  InputGroup,
+  InputRightElement,
 } from '@chakra-ui/react';
 
 interface SearchInputProps {
@@ -54,14 +55,36 @@ export default function SearchInput({
     <Box as="form" onSubmit={handleSubmit} width="100%">
       <VStack spacing={4} align="stretch">
         <HStack>
-          <Input
-            placeholder="Ask a question about the laws of Westeros..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            size="lg"
-            bg="white"
-            color="black"
-          />
+          <InputGroup size="lg">
+            <Input
+              placeholder="Ask a question about the laws of Westeros..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              bg="white"
+              color="black"
+              pr="8.5rem"
+            />
+            <InputRightElement width="8rem">
+              <FormControl display="flex" alignItems="center" mb={0} justifyContent="flex-end" mr={2}>
+                <FormLabel
+                  htmlFor="expert-mode-switch"
+                  mb="0"
+                  fontSize="xs"
+                  color="gray.500"
+                  mr={2}
+                  cursor="pointer"
+                >
+                  Expert Mode
+                </FormLabel>
+                <Switch
+                  id="expert-mode-switch"
+                  size="sm"
+                  isChecked={showAdvanced}
+                  onChange={(e) => setShowAdvanced(e.target.checked)}
+                />
+              </FormControl>
+            </InputRightElement>
+          </InputGroup>
           <Button
             type="submit"
             colorScheme="blue"
@@ -73,23 +96,6 @@ export default function SearchInput({
             Ask
           </Button>
         </HStack>
-
-        <FormControl display="flex" alignItems="center">
-          <Switch
-            id="advanced-settings"
-            isChecked={showAdvanced}
-            onChange={(e) => setShowAdvanced(e.target.checked)}
-            mr={2}
-          />
-          <FormLabel
-            htmlFor="advanced-settings"
-            mb="0"
-            fontSize="sm"
-            color="gray.600"
-          >
-            Expert Mode
-          </FormLabel>
-        </FormControl>
 
         {showAdvanced && (
           <FormControl>

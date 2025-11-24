@@ -7,10 +7,64 @@ Reflections are documented in [Reflective Response](reflectiveResponse.md)
 
 ## Getting Started
 
-1. Clone the repository
-2. Install the dependencies with `pip install -r requirements.txt` in the root directory
-3. Run the server with `uvicorn app.main:app --host localhost --port 8000` or with Docker (see below)
-4. Run the frontend with `pnpm run dev` or with Docker (see below)
+### 1. Setup Environment
+
+1.  **Clone the repository**
+2.  **Set up Environment Variables**
+    
+    Copy the example environment files and fill in your API keys (OpenAI API Key and a custom API Key for auth):
+    -   Backend: Copy `.env.example` to `.env`
+    -   Frontend: Copy `frontend/.env.example` to `frontend/.env`
+
+### 2. Run the Backend
+
+Choose one of the following methods to run the backend API.
+
+**Option A: Docker (Static)**
+Use this for a stable, containerized environment.
+
+1.  Build the image:
+    ```bash
+    docker build -t norm-rag-api .
+    ```
+2.  Run the container:
+    ```bash
+    docker run -d -p 8000:80 --env-file .env --name norm-rag-api norm-rag-api
+    ```
+
+**Option B: Local with Uvicorn (Hot-reloading)**
+Use this for development to enable hot-reloading when changing backend code.
+
+1.  Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
+2.  Run the server:
+    ```bash
+    uvicorn app.main:app --host localhost --port 8000 --reload
+    ```
+
+The backend API will be available at `http://localhost:8000`.
+
+### 3. Run the Frontend
+
+The frontend is a Next.js application. It must be run locally for development.
+
+1.  Navigate to the frontend directory:
+    ```bash
+    cd frontend
+    ```
+2.  Install dependencies:
+    ```bash
+    pnpm install
+    ```
+3.  Run the development server:
+    ```bash
+    pnpm run dev
+    ```
+
+The frontend will be available at `http://localhost:3000`.
+
 
 ## Project Structure
 
@@ -64,45 +118,6 @@ The server implements a RAG pipeline that:
 - OpenAI API key
 - API key for authentication (you can set your own)
 
-### Local Setup
-
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Set environment variables:**
-   ```bash
-   export OPENAI_API_KEY="your-openai-api-key"
-   export API_KEY="your-api-key-for-auth"
-   ```
-
-3. **Run the server:**
-   ```bash
-   uvicorn app.main:app --host localhost --port 8000
-   ```
-
-   The server will start on `http://localhost:8000`
-
-### Docker Deployment
-
-1. **Build the Docker image:**
-   ```bash
-   docker build -t norm-rag-api .
-   ```
-
-2. **Run the container:**
-   ```bash
-   docker run -d \
-     -p 8000:80 \
-     -e OPENAI_API_KEY="your-openai-api-key" \
-     -e API_KEY="your-api-key-for-auth" \
-     --name norm-rag-api \
-     norm-rag-api
-   ```
-
-   The API will be available at `http://localhost:8000`
-
 ### API Documentation
 
 Once the server is running, you can access:
@@ -110,7 +125,7 @@ Once the server is running, you can access:
 - **Alternative docs:** `http://localhost:8000/redoc` (ReDoc)
 - **Health check:** `http://localhost:8000/health`
 
-### API Endpoints
+### Key API Endpoint
 
 #### POST `/query`
 
@@ -197,23 +212,4 @@ curl -X POST "http://localhost:8000/query" \
     "query": "What happens if I steal from the Sept?",
     "k": 3
   }'
-```
-
-#### Using Python:
-
-```python
-import requests
-
-url = "http://localhost:8000/query"
-headers = {
-    "X-API-Key": "your-api-key",
-    "Content-Type": "application/json"
-}
-data = {
-    "query": "What happens if I steal from the Sept?",
-    "k": 3
-}
-
-response = requests.post(url, json=data, headers=headers)
-print(response.json())
 ```

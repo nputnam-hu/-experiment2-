@@ -47,7 +47,7 @@ app.include_router(router)
 # Mount docs directory for static file serving
 docs_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs")
 if os.path.exists(docs_path):
-    app.mount("/docs-static", StaticFiles(directory=docs_path), name="docs-static")
+    app.mount("/docs", StaticFiles(directory=docs_path), name="docs")
 else:
     print(f"Warning: Docs directory not found at {docs_path}")
 

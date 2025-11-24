@@ -17,6 +17,10 @@ export default function CitationCard({
   return (
     <Box
       as={onClick ? 'button' : 'div'}
+      height="100%"
+      display="flex"
+      flexDirection="column"
+      justifyContent="flex-start"
       onClick={onClick}
       textAlign="left"
       borderWidth="1px"
